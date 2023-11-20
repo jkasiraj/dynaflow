@@ -76,7 +76,7 @@ class Experiment(BaseEntry, discriminator="Experiment"):
     DynamoDB abstraction for mlflow Experiments
     """
 
-    artifact_location: str = UnicodeAttribute()
+    artifact_location: str = UnicodeAttribute(null=True)
 
     def to_mlflow(self) -> mlflow.entities.Experiment:
         return mlflow.entities.Experiment(
@@ -122,6 +122,7 @@ class Run(BaseEntry, discriminator="Run"):
         run_info = mlflow.entities.RunInfo(
             run_id=self.id,
             run_uuid=self.id,
+            run_name=self.name,
             experiment_id=self.experiment_id,
             user_id=self.user_id,
             status=RunStatus.to_string(self.status),
@@ -162,6 +163,16 @@ class DynamodbTrackingStore(AbstractStore):
                 " Run 'dynaflow deploy' to deploy the necessary tables."
             )
 
+    def search_experiments(
+            self,
+            view_type=mlflow.entities.ViewType.ACTIVE_ONLY,
+            max_results=SEARCH_MAX_RESULTS_DEFAULT,
+            filter_string=None,
+            order_by=None,
+            page_token=None,
+    ):
+        return self.list_experiments(view_type, max_results, page_token)
+ 
     def list_experiments(
         self,
         view_type=mlflow.entities.ViewType.ACTIVE_ONLY,
@@ -320,7 +331,7 @@ class DynamodbTrackingStore(AbstractStore):
         return Run.get(run_id).to_mlflow()
 
     def update_run_info(
-        self, run_id: str, run_status: str, end_time: str
+        self, run_id: str, run_status: str, end_time: str, run_name: str
     ) -> mlflow.entities.RunInfo:
         """
         Update the metadata of the specified run.
@@ -330,6 +341,7 @@ class DynamodbTrackingStore(AbstractStore):
         run = Run.get(run_id)
         run.status = run_status
         run.end_time = end_time
+        run.run_name = run_name
         run.save()
         return run.to_mlflow().info
 
